@@ -149,7 +149,7 @@ class TLDetector(object):
                   "/world", now)
 
         except (tf.Exception, tf.LookupException, tf.ConnectivityException):
-            rospy.logerr("Failed to find camera to map transform")e
+            rospy.logerr("Failed to find camera to map transform")
 
         x = 0
         y = 0
