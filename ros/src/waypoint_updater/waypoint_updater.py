@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 
 import rospy
+import math
+import tf
+import random
+from copy import deepcopy
+from scipy.interpolate import CubicSpline
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint, TrafficLight
 from std_msgs.msg import Int32
-
-import math
-import tf
-from copy import deepcopy
-from scipy.interpolate import CubicSpline
-import random
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
@@ -22,19 +21,12 @@ Once you have created dbw_node, you will update this node to use the status of t
 Please note that our simulator also provides the exact location of traffic lights and their
 current status in `/vehicle/traffic_lights` message. You can use this message to build this node
 as well as to verify your TL classifier.
-
-TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
+# parameters
 LOOKAHEAD_WPS = 200 # 50 # Number of waypoints we will publish. You can change this number
-
-
 STOP_DIST = 2. # (in meters) Distance from closest traffic light to decide whether to stop or go through intersection
-#MAX_SPEED = 2.77# meters/second = 10 kph  #11.11# meters/second = 40 kph
-#SLOW_DIST = self.max_speed*4 # (in meters) Distance from closest traffic light must be for car to start slowing down
-ACCEL = 1.0 # Velocity increment (m/s) to be applied at each waypoint 
-
-
+ACCEL = 1.0 # Velocity increment (m/s) to be applied at each waypoint. This is a reasonable assumption so that the acceleration is much lower than 10
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -73,7 +65,6 @@ class WaypointUpdater(object):
         self.current_velocity = msg.twist.linear.x
 
     def traffic_cb(self, msg):
-        # Callback for /traffic_waypoint message
         self.light_wp = msg.data
 
     def obstacle_cb(self, msg):
@@ -101,7 +92,7 @@ class WaypointUpdater(object):
                 self.publish()
             rate.sleep()
 
-    """ Publish the final_waypoints """
+    # Publish the final_waypoints
     def publish(self):
 
         # Create Lane object and set timestamp
@@ -117,7 +108,7 @@ class WaypointUpdater(object):
         # Publish results
         self.final_waypoints_pub.publish(final_waypoints_msg)
 
-    """ Get the next LOOKAHEAD_WPS waypoints """
+    # Get the next LOOKAHEAD_WPS waypoints
     def set_final_waypoints(self):
         # Grab the next LOOKAHEAD_WPS waypoints from the base waypoints.
         self.final_waypoints = deepcopy(self.base_waypoints[self.next_waypoint_index: self.next_waypoint_index + LOOKAHEAD_WPS])
@@ -127,7 +118,7 @@ class WaypointUpdater(object):
         if rem_points > 0: 
             self.final_waypoints = self.final_waypoints + deepcopy(self.base_waypoints[0:rem_points])
     
-    """ Set the waypoint speeds based on traffic light information """
+    # Set the waypoint speeds based on traffic light information
     def set_final_waypoints_speed(self):
         
         # Get the distance between the next waypoint and the traffic light.
@@ -135,8 +126,7 @@ class WaypointUpdater(object):
 
         no_red_light_detected = self.light_wp < 0
         if no_red_light_detected:
-            # rospy.logwarn("Upcoming TL waypoint %d" % -self.light_wp)
-            # rospy.logwarn("No red light detected")
+            # generate some words
             state_id = random.randint(1,3)
             if state_id == 1:
                 rospy.logwarn("No red light detected")
@@ -144,20 +134,11 @@ class WaypointUpdater(object):
                 rospy.logwarn("Happy driving ~")
             else:
                 rospy.logwarn("Go Go Go ~")
-            # Set all waypoint velocities to MAX SPEED.
-            #for wp in self.final_waypoints: 
-            #   self.set_waypoint_velocity(wp, self.max_speed) #Accelelerate to top speed
-            #    return
+            
             speed = self.current_velocity
 
             target_speed = self.max_speed
-
-            # Creep up on the target mode...  Unfortunately, it causes us to creep once the light turns green too since we haven't yet passed the light.
-            Creep_Enabled = False
-            if Creep_Enabled and dist < self.slow_dist:
-                target_speed = self.max_speed / 2.0
             
-
             for wp in self.final_waypoints:
                 if speed < target_speed:                
                     speed = min(target_speed, speed+ACCEL)
@@ -167,12 +148,9 @@ class WaypointUpdater(object):
             
             return
 
-        # Otherwise, a red light was detected.
-
-        
+        # The case when a red light is detected:
 
         # Report message of upcoming traffic light.
-        # rospy.logwarn("Next wp: %s, Coming redlight wp: %s, distance: %s",self.next_waypoint_index, self.light_wp, dist)
         rospy.logwarn("Attention, Coming redlight in %s meters", dist)
 
         # If we're within stopping distance, then set the future waypoints to 0 velocity to stop.
@@ -202,17 +180,17 @@ class WaypointUpdater(object):
                 self.set_waypoint_velocity(wp, speed) #Accelelerate to top speed
     
 
-    """ Get the velocity at the specified waypoint index """
+    # Get the velocity at the specified waypoint index
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
 
 
-    """ Set the velocity at the specified waypoint index """ 
+    # Set the velocity at the specified waypoint index
     def set_waypoint_velocity(self, waypoint, velocity):
         waypoint.twist.twist.linear.x = velocity
 
 
-    """ Get the piece-wise distance from some waypoint indices wp1 to wp2 """  
+    # Get the piece-wise distance from some waypoint indices wp1 to wp2 
     def distance(self, waypoints, wp1, wp2):
         dist, wp3 = 0.0, -1
         #In case of wraparound
@@ -223,17 +201,13 @@ class WaypointUpdater(object):
             dist += self.distance_between_points(waypoints[i].pose.pose.position, waypoints[i+1].pose.pose.position)
         return dist
 
-    """ Euclidean distance function """
     def distance_between_points(self, a, b):
         dist = math.sqrt((a.x - b.x)**2 + (a.y - b.y)**2 + (a.z - b.z)**2)
         return dist
 
-    """ Retrieve the closest waypoint.  Note: this waypoint index may be behind the vehicle. """
     def closest_waypoint(self, position):
         return min(xrange(len(self.base_waypoints)), key = lambda p: self.distance_between_points(position, self.base_waypoints[p].pose.pose.position))
 
-
-    """ Utility to get yaw angle """
     def get_euler_yaw(self):
         quaternion = (
             self.current_pose.orientation.x,
@@ -243,8 +217,6 @@ class WaypointUpdater(object):
         euler = tf.transformations.euler_from_quaternion(quaternion)
         return euler[2]
 
-
-    """ Get the next upcoming waypoint index """
     def ahead_waypoint(self, wp_idx):
         ahead_idx = wp_idx
 

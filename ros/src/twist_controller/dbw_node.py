@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 
 import rospy
+import math
 from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped, PoseStamped
 from styx_msgs.msg import Lane, Waypoint
-import math
-
 from twist_controller import Controller
 
 '''
@@ -55,17 +54,15 @@ class DBWNode(object):
         self.steer_pub = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size=1)
         self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size=1)
         self.brake_pub = rospy.Publisher('/vehicle/brake_cmd', BrakeCmd, queue_size=1)
-    #Set class variables to default values
+        #Set class variables to default values
         self.reset()
         # TODO: Create `TwistController` object
         self.controller = Controller(wheel_base, steer_ratio, min_speed, max_lat_accel, max_steer_angle)        
-
         # TODO: Subscribe to all the topics you need to
         rospy.Subscriber('/current_velocity', TwistStamped, callback=self.current_velocity_cb, queue_size=1)
         rospy.Subscriber('/twist_cmd', TwistStamped, callback=self.twist_cmd_cb, queue_size=1)
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, callback=self.dbw_enabled_cb, queue_size=1)
-        #rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
-        #rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb, queue_size=1)
+
         self.loop()
 
     def reset(self):
@@ -92,24 +89,7 @@ class DBWNode(object):
     def dbw_enabled_cb(self, msg):
         self.dbw_enabled = msg.data
 
-    # def pose_cb(self, msg):
-    #     pass
-    #     self.pose = [msg.pose.position.x, msg.pose.position.y]
-
-    # def waypoints_cb(self, msg):
-    #     pass
-    #     self.final_waypoints = [[msg.waypoints[0].pose.pose.position.x,msg.waypoints[0].pose.pose.position.y],[msg.waypoints[5].pose.pose.position.x,msg.waypoints[5].pose.pose.position.y]]
-
-    """
-    Primary Logic for drive-by-wire node.
-
-    This logic will call the Controller object with the current state information (speed, etc) to obtain throttle, brake, and steering commands.
-
-    If DBW is enabled, then the values for throttle, braking, and steering are published.
-
-    If DBW becomes disabled, then all values are reset.
-
-    """
+    # When DBW is enabled, call the Controller object with the current state information (speed, etc) to obtain throttle, brake, and steering commands.
     def loop(self):
         rate = rospy.Rate(5) #Was originally set to 50Hz
         while not rospy.is_shutdown():

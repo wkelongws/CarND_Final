@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 import rospy
-from std_msgs.msg import Int32
-from geometry_msgs.msg import PoseStamped, Pose
-from styx_msgs.msg import TrafficLightArray, TrafficLight
-from styx_msgs.msg import Lane
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
-from light_classification.tl_classifier import TLClassifier
+import math
 import tf
 import cv2
 import yaml
+from std_msgs.msg import Int32
+from styx_msgs.msg import Lane
+from cv_bridge import CvBridge
+from sensor_msgs.msg import Image
+from geometry_msgs.msg import PoseStamped, Pose
+from styx_msgs.msg import TrafficLightArray, TrafficLight
+from light_classification.tl_classifier import TLClassifier
 
-import math
 STATE_COUNT_THRESHOLD = 2
 
 class TLDetector(object):
@@ -35,9 +35,7 @@ class TLDetector(object):
         rely on the position of the light and the camera image to predict it.
         '''
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb, queue_size=1)
-        # Only need to get first message from /vehicle/traffic_lights once traffic light classifier is implemented
-        # self.lights = rospy.wait_for_message('/vehicle/traffic_lights', TrafficLightArray).lights 
-
+        
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
 
@@ -54,9 +52,7 @@ class TLDetector(object):
         self.bridge = CvBridge()
  
         self.light_classifier = TLClassifier()
-
-
-                    
+       
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
@@ -87,15 +83,11 @@ class TLDetector(object):
         self.camera_image = msg
         if not self.lights or not self.waypoints or not self.pose: pass
 
-
-
         light_wp, state = self.process_traffic_lights()
         if state == TrafficLight.UNKNOWN:
             state_str = 'Green/Yellow'
         else:
             state_str = 'Red'
-
-        # rospy.logwarn("Light wp: %s,  Light state: %s",light_wp, state_str)
 
         '''
         Publish upcoming red lights at camera frequency.
@@ -105,11 +97,9 @@ class TLDetector(object):
         '''
         # Does the detected state not match the previous state?
         if self.state != state:
-            # Yes - they're different.  Reset the counter.
             self.state_count = 0
             self.state = state
         elif self.state_count >= STATE_COUNT_THRESHOLD:
-            # Elseif the state count is above the persistence threshold
             self.last_state = self.state
             light_wp = light_wp if state == TrafficLight.RED else -1 # (-light_wp)
             self.last_wp = light_wp
@@ -159,9 +149,7 @@ class TLDetector(object):
                   "/world", now)
 
         except (tf.Exception, tf.LookupException, tf.ConnectivityException):
-            rospy.logerr("Failed to find camera to map transform")
-
-        #TODO Use tranform and rotation to calculate 2D position of light in image
+            rospy.logerr("Failed to find camera to map transform")e
 
         x = 0
         y = 0
